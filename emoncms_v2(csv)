@@ -1,5 +1,5 @@
 /**
-emconcmsv2 (16May2016)
+emconcmsv2 (17May2016) csv upload
 *
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 in compliance with the License. You may obtain a copy of the License at:
@@ -50,22 +50,60 @@ subscribe(power, "power", handlePowerEvent)
 }
 
 def handlePowerEvent(evt) {
-logField(evt.value)
+    logField(evt,"power") { it.toString() }
 }
 
+private logField(evt, field, Closure c) {
+    def value = c(evt.value)
+    float watts = value.toFloat()
+    def kwatts = watts/1000
+    def now = Calendar.instance
+    def date = now.time
+    def millis = date.time
+    def secs = millis/1000
+    secs = secs.toInteger()
+        
+    def params = [
+         uri: "https://emoncms.org/input/post.json?csv=${evt.value}&apikey=fc4699d93beacfab5ade0eed29d918a4"
+    ] 
+    
+    log.debug "params = ${params}"
+        
+    try {
+    	log.debug "running commmand: httpGet(${params})"
+        httpGet(params)
+	} catch (e) {
+    	log.info "httpPost response: ${e}"
+    }
+    
+}
+
+
+
+
+//Jonathan Code below here (not working)
+/*
 def logField(watts) {
 log.info "watts value= ${watts}"
 
 //here we are crafting the specific HTTP request to send to Emon CMS given the API key
 //provided earlier and the reading that the power monitor sent to the event handler.
 
-def postApi = [
-	
+
+/*
+def postApi = [	
     uri: "https://emoncms.org",
-    path: "/input/post.json?json={power:${watts}}",
+    path: "/input/post.json?json={power:${watts}}",    
+//    body: [ apikey: "$channelKey" ]
+//    ]
+*//*
+def postApi = [
+	uri: 'https://emoncms.org',
+    path: '/input/post.json?json={power:200}&inputid=0',
     body: [ apikey: "$channelKey" ]
-    ]
-    
-    log.debug "postApi = ${postApi}"
-    httpPost(postApi) //{response -> log.info "httpPost response: ${response.status}"     }
+]
+
+//    log.debug "postApi = ${postApi}"
+    httpPost(postApi) {response -> log.info "httpPost response: ${response.status}"     }
 }
+*/
