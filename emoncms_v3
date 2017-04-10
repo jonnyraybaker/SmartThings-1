@@ -1,0 +1,105 @@
+/**
+EmonCMSv2 (March2017)
+Allows you to configure the node for power or energy streams
+*
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+in compliance with the License. You may obtain a copy of the License at:
+*
+http://www.apache.org/licenses/LICENSE-2.0
+*
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+for the specific language governing permissions and limitations under the License.
+*
+*/
+
+definition(
+name: "emoncms_v3",
+namespace: "Jonathan Baker",
+author: "Jonathan Baker",
+description: "Log to emoncms",
+category: "My Apps",
+iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
+iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
+iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+
+preferences {
+	section("Log devices...") {
+		input "energymeters", "capability.energyMeter", title: "Energy Meters", required: false, multiple: true
+        input "powers", "capability.powerMeter", title: "Power Meters", required: false, multiple: true
+	}
+
+    section ("EmonCMS Feed write API key...") {
+        input "channelKey", "text", title: "API key"
+        }
+        
+	section ("EmonCMS Feed node numbers...") {
+        input "node_p", "text", title: "Desired Power Node #", required: false
+        input "node_e", "text", title: "Desired Energy Node #", required: false
+        }
+
+}
+
+def installed() {
+initialize()
+}
+
+def updated() {
+unsubscribe()
+unschedule()
+log.debug "Attempted to Unschedule"
+if (canSchedule()) {log.debug "all unscheduled."}
+else {log.debug "still waiting for unschedule."}
+initialize()
+}
+
+def initialize() {
+	log.info "Initialized"
+    subscribe(powers, "power", handlePowerEvent) 
+	subscribe(energymeters, "energy", handleEnergyEvent)
+}
+
+def handlePowerEvent(evt) {
+    log.info "PowerEvent"
+    logField(evt,"power") { it.toString() }
+}
+
+def handleEnergyEvent(evt) { 
+	log.info "EnergyEvent"
+    logField(evt,"energy") { it.toString() }    
+}
+
+private logField(evt, field, Closure c) {
+
+	log.info "field: ${field}" //tells you if you are logging power (watts) or energy (kWh)
+
+    if (field == "power") {  //power is node_p
+       log.debug "Power value is ${evt.value}"
+        def params = [
+             uri: "https://emoncms.org/input/post.json?node=${node_p}&csv=${evt.value}&apikey=${channelKey}"
+        ]
+
+        try {
+            log.debug "running power params commmand: httpGet(${params})"
+            httpGet(params)
+        } catch (e) {
+            log.info "httpGet response: ${e}"
+        }
+	}
+    
+    else if (field == "energy") {  //energy is node_e
+       log.debug "Energy value is ${evt.value}"
+        def params = [
+             uri: "https://emoncms.org/input/post.json?node=${node_e}&csv=${evt.value}&apikey=${channelKey}"
+        ]
+
+        log.debug "params = ${params}"
+
+        try {
+            log.debug "running energy params commmand: httpGet(${params})"
+            httpGet(params)
+        } catch (e) {
+            log.info "httpGet response: ${e}"
+        }
+	}
+}
